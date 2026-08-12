@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mintcheck — is this Solana token safe?</title>
+<meta name="description" content="Paste a Solana token mint and instantly see the risk flags: can the creator mint more, can they freeze your tokens. No wallet, no signup." />
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12151d; --line: #222735; --ink: #e8ecf4;
+    --mut: #8b93a7; --faint: #5b6273; --acc: #14f195; --acc2: #9945ff;
+    --red: #ff6b6b; --amber: #ffbe5c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+  h1 b { color: var(--acc); font-weight: 800; }
+  .tag { color: var(--mut); font-size: 13px; }
+  p.lead { color: var(--mut); margin: 10px 0 26px; }
+  .row { display: flex; gap: 10px; }
+  input, button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 12px 14px; }
+  input { flex: 1; min-width: 0; }
+  input:focus { outline: none; border-color: var(--acc2); }
+  button { cursor: pointer; font-weight: 600; background: var(--acc); color: #05271a; border-color: transparent; white-space: nowrap; }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: default; }
+  .examples { margin-top: 8px; font-size: 13px; color: var(--faint); }
+  .examples a { cursor: pointer; color: var(--acc2); }
+  .msg { margin-top: 22px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
+  .msg.err { border-color: rgba(255,107,107,.5); color: #ffc9c9; }
+  .verdict { margin-top: 20px; border-radius: 14px; padding: 18px 20px; border: 1px solid var(--line); background: var(--panel); }
+  .verdict h2 { margin: 0 0 4px; font-size: 20px; }
+  .verdict.good { border-color: rgba(20,241,149,.5); }
+  .verdict.warn { border-color: rgba(255,190,92,.5); }
+  .verdict.bad { border-color: rgba(255,107,107,.5); }
+  .verdict.good h2 { color: var(--acc); }
+  .verdict.warn h2 { color: var(--amber); }
+  .verdict.bad h2 { color: var(--red); }
+  .verdict p { margin: 4px 0 0; color: var(--mut); font-size: 14px; }
+  .flags { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .flag { display: flex; gap: 12px; align-items: flex-start; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .flag .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .flag.ok .dot { background: var(--acc); box-shadow: 0 0 10px rgba(20,241,149,.5); }
+  .flag.risk .dot { background: var(--red); box-shadow: 0 0 10px rgba(255,80,80,.5); }
+  .flag .t { font-weight: 600; }
+  .flag .d { color: var(--mut); font-size: 13px; margin-top: 2px; }
+  .flag .d .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--faint); }
+  .locked { margin-top: 12px; padding: 13px 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--mut); font-size: 13.5px; }
+  .locked a { color: var(--acc); font-weight: 600; }
+  a { color: var(--acc2); }
+  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--mut); font-size: 13px; }
+  footer .tip { margin-top: 8px; }
+  footer code { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px; font-size: 12px; }
+  .copy { cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--mut); border-radius: 7px; padding: 3px 8px; font-size: 12px; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 14px; margin-top: 12px; font-size: 13.5px; }
+  .kv .k { color: var(--mut); } .kv .v { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><b>mint</b>check</h1>
+    <span class="tag">is this Solana token safe?</span>
+  </header>
+  <p class="lead">Paste a token mint. Two questions decide most rugs: can the creator print more, and can they freeze your tokens. No wallet, no signup.</p>
+
+  <div class="row">
+    <input id="mint" placeholder="Token mint address" spellcheck="false" autocomplete="off" />
+    <button id="go">Check</button>
+  </div>
+  <div class="examples">Try: <a id="ex">a well-known token (USDC)</a></div>
+
+  <div id="out"></div>
+
+  <footer>
+    <div>Free and open. Reads public chain data only — nothing stored, no server of ours. Also try <a href="../">txplain</a>, plain-English Solana transactions.</div>
+    <div class="tip">Useful? Tip the wallet that built it: <code id="tipaddr">qjrAgD1QGyaZuRAz1RB9fFAdU5UPsMDbQGujcXCitr3</code> <button class="copy" id="copytip">copy</button></div>
+  </footer>
+</div>
+
+<script>
+const REFERRAL_RPC_URL = "https://www.helius.dev/";
+const RPC = "https://solana-rpc.publicnode.com";
+const $ = (id) => document.getElementById(id);
+const short = (s, n = 4) => (s && s.length > 2 * n + 1 ? s.slice(0, n) + "…" + s.slice(-n) : s);
+
+async function rpc(method, params) {
+  const res = await fetch(RPC, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+  if (!res.ok) throw new Error("RPC HTTP " + res.status);
+  const j = await res.json();
+  if (j.error) throw new Error("RPC: " + (j.error.message || JSON.stringify(j.error)));
+  return j.result;
+}
+
+function fmtSupply(raw, decimals) {
+  try {
+    const n = Number(BigInt(raw) / BigInt(10) ** BigInt(decimals));
+    return n.toLocaleString();
+  } catch { return raw; }
+}
+
+async function check() {
+  const mint = $("mint").value.trim();
+  if (!mint) return;
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) {
+    $("out").innerHTML = `<div class="msg err">That doesn't look like a mint address (32-44 base58 characters).</div>`;
+    return;
+  }
+  $("go").disabled = true;
+  $("out").innerHTML = `<div class="msg">Reading the mint…</div>`;
+  try {
+    const ai = await rpc("getAccountInfo", [mint, { encoding: "jsonParsed" }]);
+    const val = ai && ai.value;
+    if (!val) { $("out").innerHTML = `<div class="msg err">No account found for that address on mainnet.</div>`; return; }
+    const parsed = val.data && val.data.parsed;
+    if (!parsed || parsed.type !== "mint") {
+      $("out").innerHTML = `<div class="msg err">That address is a valid account but not a token mint (it's a ${parsed ? parsed.type : "non-token"} account).</div>`;
+      return;
+    }
+    render(mint, parsed.info);
+  } catch (e) {
+    $("out").innerHTML = `<div class="msg err">${e.message}</div>`;
+  } finally {
+    $("go").disabled = false;
+  }
+}
+
+function render(mint, info) {
+  const canMint = !!info.mintAuthority;
+  const canFreeze = !!info.freezeAuthority;
+  const risks = (canMint ? 1 : 0) + (canFreeze ? 1 : 0);
+
+  let cls = "good", head = "No authority red flags", sub = "The creator cannot mint more tokens or freeze yours. This is what a fair, finalized token looks like — though it says nothing about liquidity or the team.";
+  if (risks === 1) { cls = "warn"; head = "One red flag"; sub = "Not automatically a scam, but one power is still in the creator's hands. Understand it before you buy."; }
+  if (risks === 2) { cls = "bad"; head = "Two red flags"; sub = "The creator can both print more tokens and freeze yours. On an anonymous memecoin, that's exactly how rugs happen — treat with strong caution. (A regulated token like USDC keeps these powers on purpose, so read the flags as 'who do you trust with them', not an automatic verdict.)"; }
+
+  const flag = (risk, t, d) => `<div class="flag ${risk ? "risk" : "ok"}"><div class="dot"></div><div><div class="t">${t}</div><div class="d">${d}</div></div></div>`;
+
+  let html = `<div class="verdict ${cls}"><h2>${head}</h2><p>${sub}</p>
+    <div class="kv">
+      <div class="k">Supply</div><div class="v">${fmtSupply(info.supply, info.decimals)}</div>
+      <div class="k">Decimals</div><div class="v">${info.decimals}</div>
+    </div>
+  </div>`;
+
+  html += `<div class="flags">`;
+  html += flag(canMint,
+    canMint ? "Mint authority is ACTIVE — supply can grow" : "Mint authority revoked — supply is fixed",
+    canMint ? `The holder of <span class="mono">${short(info.mintAuthority)}</span> can create new tokens at any time, diluting everyone.` : `No one can create new tokens. Supply is capped.`);
+  html += flag(canFreeze,
+    canFreeze ? "Freeze authority is ACTIVE — your tokens can be frozen" : "Freeze authority revoked — tokens can't be frozen",
+    canFreeze ? `The holder of <span class="mono">${short(info.freezeAuthority)}</span> can freeze token accounts, blocking you from selling.` : `No one can freeze your tokens. You can always move them.`);
+  html += `</div>`;
+
+  html += `<div class="locked">Holder concentration — how much a few wallets control — needs a full RPC endpoint the public one blocks.
+    <a href="${REFERRAL_RPC_URL}" target="_blank" rel="noopener">Grab a free RPC key</a> to unlock deeper checks.</div>`;
+
+  html += `<div class="msg" style="margin-top:16px"><a href="https://solscan.io/token/${mint}" target="_blank" rel="noopener">Open this token on Solscan ↗</a></div>`;
+
+  $("out").innerHTML = html;
+}
+
+$("go").addEventListener("click", check);
+$("mint").addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
+$("ex").addEventListener("click", () => { $("mint").value = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; check(); });
+$("copytip").addEventListener("click", async () => {
+  await navigator.clipboard.writeText($("tipaddr").textContent);
+  $("copytip").textContent = "copied"; setTimeout(() => ($("copytip").textContent = "copy"), 1500);
+});
+</script>
+</body>
+</html>
